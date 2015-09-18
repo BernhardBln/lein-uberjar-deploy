@@ -28,64 +28,35 @@
     "snapshots"
     "releases"))
 
-(defn m2-settings-file [] (format "%s/.m2/settings.xml" (System/getProperty "user.home")))
-
 (defn abort [message]
   (binding [*out* *err*] 
     (println message)
     (System/exit 1)))
 
-(defn get-m2-settings-xml [] (xml/parse-str (slurp (m2-settings-file))))
-(defn create-zip [xml] (zip/xml-zip xml))
-
-(defn get-username-from-m2-xml [id] (zx/xml-> (create-zip (get-m2-settings-xml)) :servers :server [:id id] :username zx/text))
-(defn get-password-from-m2-xml [id] (zx/xml-> (create-zip (get-m2-settings-xml)) :servers :server [:id id] :password zx/text))
-
 (defn get-repo-values [project name-to-find]
-  (filter (fn[x](= name-to-find (first x))) (:repositories project))
-)
+  (filter (fn[x](= name-to-find (first x))) (:deploy-repositories project)))
 
 (defn get-repo-value [project value]
   (let [entry (get-repo-values project (get-target project))]
     (nth (find (get (first entry) 1) value) 1)))
 
-(defn check-m2-settings-file [project]
-  (if-not (.exists (new java.io.File (m2-settings-file))) 
-    (abort (format "File %s not found" (m2-settings-file))))
-
-  (if (empty? (get-username-from-m2-xml (get-repo-value project :id)))
-    (abort (format "username not found for server with id \"%s\" in %s" (get-repo-value project :id) (m2-settings-file))))
-
-  (if (empty? (get-password-from-m2-xml (get-repo-value project :id)))
-    (abort (format "password not found for server with id \"%s\" in %s" (get-repo-value project :id) (m2-settings-file)))))
-
 (defn confirm-repo-defined-in-project [project]
   (if (nil? (get-repo-value project :url))
-    (abort (format ":url not found for \"%s\" entry in project's :repositories" (get-target project))))
+    (abort (format ":url not found for \"%s\" entry in project's :deploy-repositories" (get-target project))))
 
   (if (nil? (get-repo-value project :id))
-    (abort (format ":id not found for \"%s\" entry in project's :repositories" (get-target project)))))
-
-(defn specify-credentials [project] 
-  {:repositories 
-   [
-    ["snapshots" {:username (get-username-from-m2-xml (get-repo-value project :id)) :password (get-password-from-m2-xml (get-repo-value project :id))}]
-    ["releases"  {:username (get-username-from-m2-xml (get-repo-value project :id)) :password (get-password-from-m2-xml (get-repo-value project :id))}]]})
-
-(defn merge-credentials-into-project [project]
-    (leiningen.core.project/merge-profiles project [(specify-credentials project)]))
+    (abort (format ":id not found for \"%s\" entry in project's :deploy-repositories" (get-target project)))))
 
 (defn check-config [project]
-  (confirm-repo-defined-in-project project)
-  (check-m2-settings-file project))
+  (confirm-repo-defined-in-project project))
 
 (defn uberjar-deploy
   "Deploy project's uberjar and pom.xml. 
 
-A :repositories entry must be present in the project.clj, containing the
+A :deploy-repositories entry must be present in the project.clj, containing the
 snapshots and releases :url locations. For example,
 
-  :repositories [
+  :deploy-repositories [
     [\"snapshots\" {:id \"nexus\" :url \"http://host:8081/nexus/content/repositories/snapshots\"}]
     [\"releases \" {:id \"nexus\" :url \"http://host:8081/nexus/content/repositories/releases\"}]
   ]
@@ -101,8 +72,7 @@ are obtained."
 
   [project & args]
   (check-config project)
-  (let [project (merge-credentials-into-project project)]
     (uberjar project)
     (pom project)
-    (deploy project (get-target project) (get-group-and-name project) (get-version project) (get-uberjar-file-path project) get-pom-file-path)))
+    (deploy project (get-target project) (get-group-and-name project) (get-version project) (get-uberjar-file-path project) get-pom-file-path))
 
