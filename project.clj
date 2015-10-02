@@ -1,4 +1,4 @@
-(defproject theladders/lein-uberjar-deploy "1.0.1-SNAPSHOT"
+(defproject theladders/lein-uberjar-deploy "1.0.1-ACROLINX"
   :description "Create and Deploy uberjar."
   :url "https://github.com/TheLadders/lein-uberjar-deploy"
   :license {:name "MIT"
